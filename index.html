@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>Greedkeep — income maze TD roguelike</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="stat" id="stLives">❤️ 20</div>
+    <div class="stat" id="stGold">🪙 90</div>
+    <div class="stat" id="stIncome">📈 12</div>
+    <div class="stat" id="stWave">🌊 0</div>
+    <div class="spacer"></div>
+    <button id="btnSpeed" class="chip">1×</button>
+    <button id="btnRestart" class="chip">↻</button>
+  </header>
+  <div id="relicBar"></div>
+  <div id="canvasWrap">
+    <canvas id="game"></canvas>
+    <div id="towerPanel" class="hidden"></div>
+  </div>
+  <div id="hint"></div>
+  <footer id="bottombar">
+    <div id="buildBtns"></div>
+    <div id="actionBtns">
+      <button id="btnInvest"></button>
+      <button id="btnSend" class="primary"></button>
+    </div>
+  </footer>
+  <div id="overlay" class="hidden"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
