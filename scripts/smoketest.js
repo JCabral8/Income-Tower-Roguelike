@@ -68,13 +68,19 @@ const harness = `
   state.gold = 100; // back to something realistic-ish
   state.buildType = null;
 
-  // Simulate 12 waves
+  // Simulate ~16 waves. Make the rig effectively invincible + rich so we
+  // observe the *draft cadence* in isolation, independent of balance.
+  state.lives = 99999;
+  state.gold = 99999;
+  const draftWaves = [];
+  let drafted = 0;
   let simT = 0;
   const DT = 1 / 30;
-  while (state.wave < 12 && state.phase !== 'over' && simT < 4000) {
+  while (state.wave < 16 && state.phase !== 'over' && simT < 6000) {
     if (state.phase === 'prep') doSend();
     if (state.phase === 'draft') {
-      // pretend the player picks by applying a random eligible relic
+      drafted++;
+      draftWaves.push(state.wave);
       const picks = rollDraft();
       picks[0].apply(state);
       state.relics.push(picks[0].id);
@@ -83,9 +89,16 @@ const harness = `
     if (state.phase === 'wave') update(DT);
     simT += DT;
   }
-  assert(simT < 4000, 'simulation must not softlock (timed out)');
-  console.log('waves cleared:', state.wave, '| lives:', state.lives, '| gold:', state.gold,
-              '| income:', state.income, '| relics:', state.relics.join(','), '| phase:', state.phase);
+  assert(simT < 6000, 'simulation must not softlock (timed out)');
+  console.log('waves cleared:', state.wave, '| drafts at:', draftWaves.join(','),
+              '| relics:', state.relics.join(','), '| income:', state.income);
+
+  // Cadence: every draft lands on a multiple of draftEvery, and we cleared
+  // plenty of non-draft waves in between (i.e. it is NOT every wave).
+  assert(drafted >= 3, 'should have drafted at least 3 times by wave 16, got ' + drafted);
+  assert(draftWaves.every(w => w % CFG.draftEvery === 0),
+    'every draft must land on a multiple of draftEvery=' + CFG.draftEvery + ', got ' + draftWaves.join(','));
+  assert(state.wave > CFG.draftEvery + 1, 'non-draft waves must run between drafts');
 
   // Economy actions
   state.gold = 1000;

@@ -16,7 +16,7 @@ const EXIT  = { x: Math.floor(COLS / 2), y: ROWS - 1 };
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 const CFG = {
-  startGold: 90,
+  startGold: 80,
   startIncome: 12,
   startLives: 20,
   firstPrep: 30,
@@ -26,7 +26,8 @@ const CFG = {
   investGrowth: 1.25,
   sellRatio: 0.7,
   maxLevel: 7,
-  skipDraftGold: 15,
+  skipDraftGold: 20,
+  draftEvery: 4,   // relic draft cadence (Ravenswatch-style power spike)
 };
 
 const TOWERS = {
@@ -39,22 +40,22 @@ const TOWERS = {
 /* ---------------- Relics ---------------- */
 
 const RELICS = [
-  { id: 'sharp',     icon: '🏹', rarity: 'common', name: 'Sharpened Arrows', desc: 'Arrow towers deal +30% damage.',
-    apply: s => { s.mods.dmg.arrow *= 1.3; } },
-  { id: 'shells',    icon: '💣', rarity: 'common', name: 'Heavy Shells', desc: 'Cannon towers deal +30% damage.',
-    apply: s => { s.mods.dmg.cannon *= 1.3; } },
-  { id: 'nest',      icon: '🎯', rarity: 'common', name: "Sniper's Nest", desc: 'Sniper towers deal +35% damage.',
-    apply: s => { s.mods.dmg.sniper *= 1.35; } },
-  { id: 'rime',      icon: '❄️', rarity: 'common', name: 'Rime Coating', desc: 'Frost towers deal +40% damage.',
-    apply: s => { s.mods.dmg.frost *= 1.4; } },
-  { id: 'overclock', icon: '⚙️', rarity: 'common', name: 'Overclock', desc: 'All towers attack 12% faster.',
-    apply: s => { s.mods.rate *= 1.12; } },
-  { id: 'bounty',    icon: '💰', rarity: 'common', name: 'Bounty Hunter', desc: 'Kills give +30% gold.',
-    apply: s => { s.mods.bounty *= 1.3; } },
-  { id: 'chest',     icon: '🧰', rarity: 'common', name: 'War Chest', desc: 'Gain 60 gold right now.',
-    apply: s => { s.gold += 60; } },
-  { id: 'dividend',  icon: '🏦', rarity: 'common', name: 'Dividend', desc: 'Permanently gain +4 income.',
-    apply: s => { s.income += 4; } },
+  { id: 'sharp',     icon: '🏹', rarity: 'common', name: 'Sharpened Arrows', desc: 'Arrow towers deal +45% damage.',
+    apply: s => { s.mods.dmg.arrow *= 1.45; } },
+  { id: 'shells',    icon: '💣', rarity: 'common', name: 'Heavy Shells', desc: 'Cannon towers deal +45% damage.',
+    apply: s => { s.mods.dmg.cannon *= 1.45; } },
+  { id: 'nest',      icon: '🎯', rarity: 'common', name: "Sniper's Nest", desc: 'Sniper towers deal +50% damage.',
+    apply: s => { s.mods.dmg.sniper *= 1.5; } },
+  { id: 'rime',      icon: '❄️', rarity: 'common', name: 'Rime Coating', desc: 'Frost towers deal +55% damage.',
+    apply: s => { s.mods.dmg.frost *= 1.55; } },
+  { id: 'overclock', icon: '⚙️', rarity: 'common', name: 'Overclock', desc: 'All towers attack 18% faster.',
+    apply: s => { s.mods.rate *= 1.18; } },
+  { id: 'bounty',    icon: '💰', rarity: 'common', name: 'Bounty Hunter', desc: 'Kills give +45% gold.',
+    apply: s => { s.mods.bounty *= 1.45; } },
+  { id: 'chest',     icon: '🧰', rarity: 'common', name: 'War Chest', desc: 'Gain 90 gold right now.',
+    apply: s => { s.gold += 90; } },
+  { id: 'dividend',  icon: '🏦', rarity: 'common', name: 'Dividend', desc: 'Permanently gain +6 income.',
+    apply: s => { s.income += 6; } },
   { id: 'fortify',   icon: '🛡️', rarity: 'common', name: 'Fortify', desc: 'Gain +5 lives.',
     apply: s => { s.lives += 5; } },
   { id: 'boom',      icon: '💥', rarity: 'rare', name: 'Bigger Booms', desc: 'Cannon splash radius +30%.',
@@ -67,12 +68,12 @@ const RELICS = [
     apply: s => { s.mods.investBonus += 1; } },
   { id: 'taxbreak',  icon: '🧾', rarity: 'rare', name: 'Tax Break', desc: 'Invest price rises more slowly.',
     apply: s => { s.mods.growthDelta -= 0.05; }, can: s => s.mods.growthDelta > -0.1 },
-  { id: 'watch',     icon: '🔭', rarity: 'rare', name: 'Long Watch', desc: 'All towers gain +0.3 range.',
-    apply: s => { s.mods.range += 0.3; } },
-  { id: 'golden',    icon: '👑', rarity: 'epic', name: 'Golden Age', desc: 'Income payouts are +25% larger.',
-    apply: s => { s.mods.incomeMul *= 1.25; } },
-  { id: 'glass',     icon: '🍷', rarity: 'epic', name: 'Glass Cannon', desc: 'All towers +35% damage. Lose 4 lives.',
-    apply: s => { s.mods.dmg.all *= 1.35; s.lives = Math.max(1, s.lives - 4); } },
+  { id: 'watch',     icon: '🔭', rarity: 'rare', name: 'Long Watch', desc: 'All towers gain +0.4 range.',
+    apply: s => { s.mods.range += 0.4; } },
+  { id: 'golden',    icon: '👑', rarity: 'epic', name: 'Golden Age', desc: 'Income payouts are +30% larger.',
+    apply: s => { s.mods.incomeMul *= 1.3; } },
+  { id: 'glass',     icon: '🍷', rarity: 'epic', name: 'Glass Cannon', desc: 'All towers +45% damage. Lose 4 lives.',
+    apply: s => { s.mods.dmg.all *= 1.45; s.lives = Math.max(1, s.lives - 4); } },
   { id: 'midas',     icon: '✨', rarity: 'epic', name: 'Midas Touch', desc: 'Gain gold equal to your income, and +2 income.',
     apply: s => { s.gold += s.income; s.income += 2; } },
 ];
@@ -82,7 +83,7 @@ const RARITY_WEIGHT = { common: 6, rare: 3, epic: 1 };
 /* ---------------- Waves ---------------- */
 
 function waveDef(n) {
-  const hpBase = 14 * Math.pow(1.22, n - 1);
+  const hpBase = 16 * Math.pow(1.24, n - 1);
   const bountyBase = Math.max(1, Math.round(2 + hpBase * 0.04));
   const count = 10 + Math.min(12, Math.floor(n * 0.7));
   if (n % 5 === 0) {
@@ -336,7 +337,19 @@ function endWave() {
   const payout = Math.round(state.income * state.mods.incomeMul);
   state.gold += payout;
   addFloater(COLS / 2, ROWS / 2 - 1, `+${payout}🪙 income`, '#4ade80');
-  openDraft(payout);
+  if (state.wave % CFG.draftEvery === 0) {
+    openDraft(payout);
+  } else {
+    advanceToPrep();
+  }
+}
+
+function advanceToPrep() {
+  checkGameOver();
+  if (state.phase !== 'over') {
+    state.phase = 'prep';
+    state.prepLeft = CFG.prepTime;
+  }
 }
 
 function checkGameOver() {
@@ -739,7 +752,8 @@ function syncUI() {
 
   // send
   if (state.phase === 'prep') {
-    btnSend.innerHTML = `▶ Send wave ${state.wave + 1}<br>+${sendBonus()}🪙 · ${Math.ceil(state.prepLeft)}s`;
+    const spike = (state.wave % CFG.draftEvery === CFG.draftEvery - 1) ? '⚡ ' : '';
+    btnSend.innerHTML = `${spike}▶ Send wave ${state.wave + 1}<br>+${sendBonus()}🪙 · ${Math.ceil(state.prepLeft)}s`;
     btnSend.disabled = false;
   } else if (state.phase === 'wave') {
     btnSend.innerHTML = `Wave ${state.wave}<br>${state.enemies.length + state.spawnQueue} left`;
@@ -761,7 +775,10 @@ function syncUI() {
   } else if (state.wave === 0) {
     hintEl.textContent = 'Build a maze between ▼ and ⌂, then send the wave';
   } else {
-    hintEl.textContent = 'Invest to grow income · send early for bonus gold';
+    const togo = CFG.draftEvery - (state.wave % CFG.draftEvery);
+    hintEl.textContent = togo === 1
+      ? '⚡ Relic power spike after the next wave!'
+      : `Invest to grow income · ${togo} waves to next relic`;
   }
 
   syncTowerPanel();
@@ -825,8 +842,8 @@ function openDraft(payout) {
   const picks = rollDraft();
   overlay.innerHTML = `
     <div class="modal">
-      <h2>Wave ${state.wave} cleared!</h2>
-      <div class="sub">+${payout}🪙 income paid · pick a relic</div>
+      <h2>⚡ Power Spike — Wave ${state.wave}</h2>
+      <div class="sub">+${payout}🪙 income paid · choose a relic</div>
       <div class="cards">
         ${picks.map((r, i) => `
           <button class="card ${r.rarity}" data-i="${i}">
@@ -854,11 +871,7 @@ function openDraft(payout) {
 
 function closeDraft() {
   hideOverlay();
-  checkGameOver(); // glass cannon can't kill you (min 1 life), but be safe
-  if (state.phase !== 'over') {
-    state.phase = 'prep';
-    state.prepLeft = CFG.prepTime;
-  }
+  advanceToPrep();
 }
 
 function showGameOver() {

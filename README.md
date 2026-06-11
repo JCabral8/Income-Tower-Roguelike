@@ -7,8 +7,9 @@ A prototype mashing up three things we love:
   bonus. Towers now vs. economy later is the core decision.
 - **Mazing TD** — open grid, towers physically block the board, creeps pathfind
   around whatever you build. The maze *is* your defense.
-- **Roguelike** — after every wave you draft 1-of-3 random relics. Endless scaling,
-  run ends at 0 lives, chase your best wave.
+- **Roguelike** — every few waves you hit a power spike and draft 1-of-3 random
+  relics (Ravenswatch-style). Endless scaling, run ends at 0 lives, chase your
+  best wave.
 
 No build step, no dependencies — pure HTML/Canvas/JS.
 
@@ -33,10 +34,11 @@ every push. Enable it once in repo **Settings → Pages → Source: GitHub Actio
 | Upgrade / sell | Tap a placed tower |
 | Invest 📈 | Spend gold for permanent +income (price rises each time) |
 | Send early ▶ | Start the next wave before the timer for bonus gold |
-| Draft | After each wave, pick 1 of 3 relics (or skip for gold) |
+| Draft | Every 4th wave (a ⚡ power spike), pick 1 of 3 relics (or skip for gold) |
 
-Income is paid at the end of each wave. Kills pay small bounties. Leaks cost
-lives (bosses cost 5). Boss every 5th wave; creep types rotate
+Income is paid at the end of **every** wave; the relic draft only triggers on the
+⚡ power-spike waves (every 4th). Kills pay small bounties. Leaks cost lives
+(bosses cost 5). Boss every 5th wave; creep types rotate
 grunt → swarm → fast → tank.
 
 ### Towers
