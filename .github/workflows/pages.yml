@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/start-from-scratch-ozo5na
+      - claude/goal-command-usage-VmrK4 # current default branch — Pages only deploys from here
   workflow_dispatch:
 
 permissions:
