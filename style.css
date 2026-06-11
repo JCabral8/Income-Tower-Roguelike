@@ -108,21 +108,25 @@ canvas {
 /* ---------- bottom bar ---------- */
 #bottombar {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
 }
 #buildBtns {
   display: flex;
   gap: 6px;
-  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+#buildBtns::-webkit-scrollbar { display: none; }
 #buildBtns button {
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: 64px;
   background: #161d28;
   color: #e6edf3;
   border: 1px solid #2d3a4d;
   border-radius: 10px;
-  padding: 6px 2px;
+  padding: 6px 6px;
   font-size: 11px;
   line-height: 1.3;
   font-weight: 700;
@@ -212,7 +216,10 @@ canvas {
   font-weight: 700;
   cursor: pointer;
 }
+.modal.wide { max-width: 460px; max-height: 86dvh; overflow-y: auto; text-align: left; }
 .modal .big {
+  display: block;
+  width: 100%;
   background: #1d3325;
   border: 1px solid #2f5e3f;
   border-radius: 12px;
@@ -222,3 +229,42 @@ canvas {
   font-weight: 800;
   cursor: pointer;
 }
+.modal .big + .minor { display: block; width: 100%; margin-top: 8px; }
+
+.metaRow { font-size: 14px; font-weight: 700; color: #cdd6e3; margin-bottom: 14px; }
+.modal.wide .metaRow { text-align: center; }
+
+.shopSection {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8b98a9;
+  margin: 12px 0 6px;
+  font-weight: 800;
+}
+.shopRow {
+  background: #1a2230;
+  border: 1px solid #2d3a4d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.shopName { font-weight: 800; font-size: 13px; margin-bottom: 6px; }
+.shopTip { font-size: 11px; color: #8b98a9; margin-top: 5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chipBtn {
+  background: #233044;
+  color: #e6edf3;
+  border: 1px solid #36465e;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chipBtn.on { border-color: #f4d03f; background: #2a2a18; color: #f4d03f; }
+.chipBtn.buy { border-color: #2f5e3f; background: #1d3325; }
+.chipBtn:disabled { opacity: 0.4; }
+.card .nm { display: inline-block; }
+.relicBar .fam, #relicBar .fam { color: #cdd6e3; font-weight: 700; }
+#relicBar sup { font-size: 10px; }

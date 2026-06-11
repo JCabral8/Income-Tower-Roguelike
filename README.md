@@ -7,11 +7,28 @@ A prototype mashing up three things we love:
   bonus. Towers now vs. economy later is the core decision.
 - **Mazing TD** — open grid, towers physically block the board, creeps pathfind
   around whatever you build. The maze *is* your defense.
-- **Roguelike** — every few waves you hit a power spike and draft 1-of-3 random
-  relics (Ravenswatch-style). Endless scaling, run ends at 0 lives, chase your
-  best wave.
+- **Roguelike** — every 4th wave you hit a power spike and draft 1-of-3 random
+  relics (Ravenswatch-style). Endless scaling, run ends at 0 lives.
+- **Roguelite meta** — runs earn **cores**; the Workshop spends them to unlock
+  towers, equip **variant branches**, and buy permanent buffs. Your first run
+  has only the Arrow tower — everything else is earned.
 
 No build step, no dependencies — pure HTML/Canvas/JS.
+
+## Two loops
+
+**In a run** — build a maze, survive waves, draft relics, push for a high wave.
+Relics **stack with diminishing returns** per copy, but belong to families
+(⚔️ Offense / 💰 Economy / 🧊 Control); collecting 3 / 5 / 7 of a family triggers
+a big set-bonus spike, so you choose between spreading wide or committing deep.
+
+**Between runs** — cores (= waves survived, +bonus for a new best) buy:
+- **Towers**: Frost, Cannon, Sniper, then Poison (DoT) and Tesla (chain).
+- **Variant branches**: each tower has an alt you equip as a loadout choice —
+  Arrow→Scattershot, Frost→Glacier, Cannon→Mortar, Sniper→Railgun,
+  Poison→Plague, Tesla→Arc Coil.
+- **Permanent buffs**: Treasury (+start gold), Trust Fund (+base income),
+  Battlements (+lives).
 
 ## Play it
 
@@ -41,23 +58,26 @@ Income is paid at the end of **every** wave; the relic draft only triggers on th
 (bosses cost 5). Boss every 5th wave; creep types rotate
 grunt → swarm → fast → tank.
 
-### Towers
+### Towers (unlock in the Workshop; Arrow is free)
 
-| | Cost | Role |
+| | Role | Variant branch |
 |---|---|---|
-| 🏹 Arrow | 25 | Cheap, fast single-target — maze filler |
-| ❄️ Frost | 35 | Slows creeps — multiplies the value of your maze |
-| 💣 Cannon | 50 | Splash — answers swarms |
-| 🎯 Sniper | 70 | Long range, big hits — answers tanks/bosses |
+| 🏹 Arrow | Cheap, fast single-target | 🪶 Scattershot — hits 2 targets |
+| ❄️ Frost | Slows creeps | 🧊 Glacier — stronger slow, shorter range |
+| 💣 Cannon | Splash, answers swarms | 🎆 Mortar — bigger, slower booms |
+| 🎯 Sniper | Long range, big hits | 🛰️ Railgun — huge slow shots w/ cleave |
+| ☠️ Poison | Damage-over-time | 🦠 Plague — stronger, longer DoT |
+| ⚡ Tesla | Chain lightning | 🌩️ Arc Coil — chains to far more targets |
 
 ## Roadmap (rough)
 
-1. **This prototype** — validate that maze + income + draft is fun ✅
-2. Balance pass, juice (sounds, hit effects), more relics & creep abilities
-3. Meta-progression between runs (unlock towers/relics), seeded runs
-4. The real dream: **income wars** — opponents (AI, then PvP) where *you send
+1. Prototype loop — maze + income + draft ✅
+2. Roguelite meta — cores, tower/variant unlocks, permanent buffs ✅
+3. Balance pass + juice (sounds, hit effects), more relics & creep abilities
+4. More variant branches per tower; relic synergies across families
+5. The real dream: **income wars** — opponents (AI, then PvP) where *you send
    the creeps* at each other, WC3 style
-5. Package as a mobile app (PWA → Capacitor) once the loop is proven
+6. Package as a mobile app (PWA → Capacitor) once the loop is proven
 
 ## Code map
 

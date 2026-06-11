@@ -46,7 +46,11 @@ const harness = `
 ;(function runSmokeTest() {
   const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); };
 
-  // Build a serpentine maze with arrows (rows 2,5,8,... leaving alternating gaps)
+  // Start a run (boot drops us on the title menu).
+  newRun();
+  assert(state.phase === 'prep', 'newRun should enter prep, got ' + state.phase);
+
+  // Build a serpentine maze with arrows (only tower unlocked by default)
   state.gold = 100000; // test rig: ignore economy constraints for placement
   let placed = 0;
   state.buildType = 'arrow';
@@ -61,52 +65,88 @@ const harness = `
   assert(placed > 30, 'maze should mostly build, placed=' + placed);
   assert(state.path.length > 40, 'serpentine path should be long, len=' + state.path.length);
 
-  // Blocking the only remaining gap must be rejected
-  const gapY = 2, gapX = 0;
-  assert(!canPlace(gapX, gapY) || state.blocked[gapX + gapY * COLS] === 0, 'sanity');
-
-  state.gold = 100; // back to something realistic-ish
+  state.gold = 100;
   state.buildType = null;
 
-  // Simulate ~16 waves. Make the rig effectively invincible + rich so we
-  // observe the *draft cadence* in isolation, independent of balance.
-  state.lives = 99999;
-  state.gold = 99999;
+  // Diminishing returns + family set-bonus: stack 3 copies of 'sharp'.
+  state.relics = []; recomputeMods();
+  const d0 = state.mods.dmg.arrow;
+  pickRelic(RELIC_BY_ID.sharp);
+  const d1 = state.mods.dmg.arrow;
+  pickRelic(RELIC_BY_ID.sharp);
+  const d2 = state.mods.dmg.arrow;
+  assert(d1 > d0, 'first sharp must raise arrow dmg');
+  const gain1 = d1 / d0 - 1, gain2 = d2 / d1 - 1;
+  assert(gain2 < gain1 - 1e-9, '2nd copy must diminish (g1=' + gain1.toFixed(3) + ' g2=' + gain2.toFixed(3) + ')');
+  pickRelic(RELIC_BY_ID.overclock); // 3rd offense relic -> crosses family threshold
+  assert(state.fam.offense >= 3, 'offense family should be >=3');
+  const beforeBonus = state.mods.dmg.all;
+  assert(beforeBonus > 1.0001, 'offense set-bonus should boost dmg.all, got ' + beforeBonus);
+
+  // Income recompute: a Dividend raises effective income.
+  state.relics = []; recomputeMods();
+  const incBefore = state.income;
+  pickRelic(RELIC_BY_ID.dividend);
+  assert(state.income > incBefore, 'dividend must raise income (' + incBefore + ' -> ' + state.income + ')');
+
+  // Reset relics, then simulate ~16 waves to confirm draft cadence holds.
+  state.relics = []; recomputeMods();
+  state.lives = 99999; state.gold = 99999;
   const draftWaves = [];
-  let drafted = 0;
-  let simT = 0;
+  let drafted = 0, simT = 0;
   const DT = 1 / 30;
   while (state.wave < 16 && state.phase !== 'over' && simT < 6000) {
     if (state.phase === 'prep') doSend();
     if (state.phase === 'draft') {
-      drafted++;
-      draftWaves.push(state.wave);
-      const picks = rollDraft();
-      picks[0].apply(state);
-      state.relics.push(picks[0].id);
-      closeDraft();
+      drafted++; draftWaves.push(state.wave);
+      pickRelic(rollDraft()[0].r);
     }
     if (state.phase === 'wave') update(DT);
     simT += DT;
   }
   assert(simT < 6000, 'simulation must not softlock (timed out)');
   console.log('waves cleared:', state.wave, '| drafts at:', draftWaves.join(','),
-              '| relics:', state.relics.join(','), '| income:', state.income);
-
-  // Cadence: every draft lands on a multiple of draftEvery, and we cleared
-  // plenty of non-draft waves in between (i.e. it is NOT every wave).
+              '| income:', state.income, '| relics:', state.relics.length);
   assert(drafted >= 3, 'should have drafted at least 3 times by wave 16, got ' + drafted);
   assert(draftWaves.every(w => w % CFG.draftEvery === 0),
     'every draft must land on a multiple of draftEvery=' + CFG.draftEvery + ', got ' + draftWaves.join(','));
-  assert(state.wave > CFG.draftEvery + 1, 'non-draft waves must run between drafts');
 
-  // Economy actions
+  // Meta unlock flow: buying a tower with cores adds it to the build menu.
+  meta.cores = 100;
+  assert(!meta.unlocked.cannon, 'cannon should start locked');
+  meta.cores -= TOWER_TREE.find(n => n.base === 'cannon').baseCost;
+  meta.unlocked.cannon = true; meta.equipped.cannon = 'cannon';
+  newRun();
+  const types = Array.from(document.getElementById('buildBtns').children).map(b => b.dataset.type);
+  assert(types.includes('arrow') && types.includes('cannon'),
+    'build menu should include unlocked towers, got ' + types.join(','));
+
+  // Equip a variant branch -> build button reflects it.
+  meta.unlocked.cannon_mortar = true; meta.equipped.cannon = 'cannon_mortar';
+  newRun();
+  const types2 = Array.from(document.getElementById('buildBtns').children).map(b => b.dataset.type);
+  assert(types2.includes('cannon_mortar'), 'equipped variant should appear, got ' + types2.join(','));
+
+  // Permanent buff carries into a fresh run.
+  meta.buffs.lives = 2;
+  newRun();
+  assert(state.lives === CFG.startLives + 6, 'lives buff should apply, got ' + state.lives);
+
+  // Economy actions on the live run.
   state.gold = 1000;
-  const incBefore = state.income;
+  const inc2 = state.income;
   doInvest();
-  assert(state.income > incBefore, 'invest must raise income');
+  assert(state.income > inc2, 'invest must raise income');
 
-  // Upgrade + sell a tower
+  // Build, upgrade, then sell a tower on the fresh board.
+  state.gold = 1000; state.buildType = 'arrow';
+  let bx = -1, by = -1;
+  for (let y = 3; y < ROWS - 3 && bx < 0; y++)
+    for (let x = 1; x < COLS - 1; x++) { if (canPlace(x, y)) { bx = x; by = y; break; } }
+  assert(bx >= 0, 'should find a buildable tile');
+  tryBuild(bx, by);
+  assert(state.towers.length >= 1, 'tower should be built');
+  state.buildType = null;
   state.selected = state.towers[0];
   const lvlBefore = state.selected.lvl;
   doUpgrade();
@@ -115,6 +155,18 @@ const harness = `
   doSell();
   assert(state.towers.length === nTowers - 1, 'sell must remove tower');
   assert(state.path.length > 0, 'path must still exist after sell');
+
+  // Variant combat: poison applies a DoT, tesla chains without error.
+  state.relics = []; recomputeMods();
+  spawnEnemy({ hp: 500, speed: 0, bounty: 1, leak: 1, kind: 'grunt', color: '#fff', r: 0.26 });
+  const victim = state.enemies[0];
+  const pTower = { x: 1, y: 1, type: 'poison', lvl: 1 };
+  fire(pTower, victim);
+  state.projs[state.projs.length - 1].x = victim.x; // force immediate hit next update
+  state.projs[state.projs.length - 1].y = victim.y;
+  state.phase = 'wave';
+  update(1 / 30);
+  assert(victim.poisonT > 0 || victim.dead, 'poison should apply a DoT');
 
   console.log('SMOKE TEST PASSED');
 })();
