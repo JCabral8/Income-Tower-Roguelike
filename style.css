@@ -83,6 +83,7 @@ canvas {
   backdrop-filter: blur(4px);
 }
 #towerPanel .tpInfo { flex: 1; line-height: 1.35; }
+#towerPanel .combo { color: #f4d03f; font-weight: 700; font-size: 12px; }
 #towerPanel button {
   background: #233044;
   color: #e6edf3;

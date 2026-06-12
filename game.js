@@ -83,6 +83,8 @@ const RELICS = [
   { id: 'crit',      icon: '🎲', rarity: 'rare',   family: 'offense', name: 'Headshot',   stat: 'crit',  mode: 'add', base: 0.10, pct: true, suffix: 'crit (2.5×)' },
   { id: 'glass',     icon: '🍷', rarity: 'epic',   family: 'offense', name: 'Glass Cannon', stat: 'dmg.all', mode: 'mul', base: 0.40, suffix: 'all damage',
     instantNote: 'Lose 4 lives', instant: s => { s.lives = Math.max(1, s.lives - 4); } },
+  { id: 'overload',  icon: '🔗', rarity: 'epic',   family: 'offense', name: 'Overload', stat: 'perLink', mode: 'add', base: 0.03,
+    staticDesc: 'All towers: +3% damage per fusion link on the board.' },
   // -- Economy --
   { id: 'bounty',    icon: '💰', rarity: 'common', family: 'economy', name: 'Bounty Hunter', stat: 'bounty',      mode: 'mul', base: 0.45, suffix: 'kill gold' },
   { id: 'dividend',  icon: '🏦', rarity: 'common', family: 'economy', name: 'Dividend',      stat: 'incomeFlat',  mode: 'add', base: 6,    suffix: 'income' },
@@ -160,7 +162,7 @@ function freshMods() {
   return {
     dmg: { arrow: 1, frost: 1, cannon: 1, sniper: 1, poison: 1, tesla: 1, all: 1 },
     rate: 1, range: 0, bounty: 1, splash: 1, slowBonus: 0, crit: 0,
-    investBonus: 0, incomeMul: 1, incomeFlat: 0, growthDelta: 0,
+    investBonus: 0, incomeMul: 1, incomeFlat: 0, growthDelta: 0, perLink: 0,
   };
 }
 
@@ -190,6 +192,7 @@ function newRun() {
     mods: freshMods(),
     relics: [],
     fam: { offense: 0, economy: 0, control: 0 },
+    links: 0,
     speed: 1,
     selected: null,
     buildType: null,
@@ -243,6 +246,7 @@ function recomputeMods() {
   state.mods = m;
   state.fam = fam;
   state.income = Math.round(state.baseIncome + state.investIncome + m.incomeFlat);
+  recomputeSynergies();
 }
 
 /* ---------------- Pathfinding ---------------- */
@@ -318,7 +322,8 @@ function canPlace(x, y) {
 
 function towerDmg(t) {
   const base = TOWERS[t.type];
-  return base.dmg * Math.pow(1.5, t.lvl - 1) * state.mods.dmg[base.fam] * state.mods.dmg.all;
+  const link = 1 + state.mods.perLink * (state.links || 0);
+  return base.dmg * Math.pow(1.5, t.lvl - 1) * state.mods.dmg[base.fam] * state.mods.dmg.all * link;
 }
 function towerRange(t) { return TOWERS[t.type].range + 0.18 * (t.lvl - 1) + state.mods.range; }
 function towerRate(t) { return TOWERS[t.type].rate * state.mods.rate; }
@@ -335,6 +340,8 @@ function tryBuild(x, y) {
   state.towers.push({ x, y, type: state.buildType, lvl: 1, cd: 0, spent: base.cost });
   state.blocked[idx(x, y)] = 1;
   recomputeFlow();
+  recomputeSynergies();
+  renderRelicBar();
   state.ghost = null;
   setHint('');
 }
@@ -345,6 +352,7 @@ function doUpgrade() {
   const c = upgradeCost(t);
   if (state.gold < c) return;
   state.gold -= c; t.spent += c; t.lvl++;
+  recomputeSynergies();
   panelSig = '';
 }
 
@@ -356,6 +364,8 @@ function doSell() {
   state.towers = state.towers.filter(o => o !== t);
   state.selected = null;
   recomputeFlow();
+  recomputeSynergies();
+  renderRelicBar();
 }
 
 function doInvest() {
@@ -423,12 +433,73 @@ function checkGameOver() {
   showGameOver();
 }
 
+/* ---------------- Fusion synergies ----------------
+   Orthogonally adjacent towers fuse. The SHAPE of your maze becomes power:
+   - diverse neighbors -> +damage, same-family neighbors -> +fire rate
+   - specific pairings unlock named combos (Shatter / Toxic / Plague / ...). */
+
+function neighborsOf(t) {
+  const res = [];
+  for (const [dx, dy] of DIRS) { const n = towerAt(t.x + dx, t.y + dy); if (n) res.push(n); }
+  return res;
+}
+
+function intrinsicPoison(t) {
+  const b = TOWERS[t.type];
+  if (!b.poison) return null;
+  return { dps: b.poison.dps * Math.pow(1.5, t.lvl - 1) * state.mods.dmg[b.fam] * state.mods.dmg.all, dur: b.poison.dur };
+}
+
+function recomputeSynergies() {
+  for (const t of state.towers) {
+    const b = TOWERS[t.type], fam = b.fam, ns = neighborsOf(t);
+    const diverse = new Set(); let same = 0;
+    for (const n of ns) { const nf = TOWERS[n.type].fam; if (nf === fam) same++; else diverse.add(nf); }
+    const eff = {
+      dmgMul: 1 + 0.12 * diverse.size,
+      rateMul: 1 + 0.10 * same,
+      slow: b.slow || 0, slowDur: b.slowDur || 0,
+      splash: b.splash ? b.splash * state.mods.splash : 0,
+      poison: intrinsicPoison(t),
+      chain: b.chain ? { hops: b.chain.hops, falloff: b.chain.falloff } : null,
+      bonusVsSlow: 0, critVsSlow: false, splashPoison: null, chainPoison: null,
+      combos: [],
+    };
+    for (const n of ns) {
+      const nf = TOWERS[n.type].fam;
+      if (fam === 'cannon' && nf === 'frost') { eff.bonusVsSlow += 1.0; eff.combos.push('Shatter'); }
+      if (fam === 'sniper' && nf === 'frost') { eff.critVsSlow = true; eff.combos.push('Cryo'); }
+      if (fam === 'cannon' && nf === 'poison') { eff.splashPoison = intrinsicPoison(n); eff.combos.push('Toxic'); }
+      if (fam === 'tesla'  && nf === 'poison') { eff.chainPoison = intrinsicPoison(n); eff.combos.push('Plague'); }
+      if (fam === 'tesla'  && nf === 'frost')  { if (eff.chain) eff.chain.hops += 2; eff.combos.push('Storm'); }
+      if (fam === 'sniper' && nf === 'tesla')  { eff.chain = eff.chain || { hops: 1, falloff: 0.6 }; eff.combos.push('Railarc'); }
+      if (fam === 'arrow'  && nf !== 'arrow') {
+        if (nf === 'frost')  { eff.slow = Math.max(eff.slow, 0.3); eff.slowDur = Math.max(eff.slowDur, 1.2); }
+        if (nf === 'poison') { eff.poison = eff.poison || intrinsicPoison(n); }
+        if (nf === 'tesla')  { eff.chain = eff.chain || { hops: 1, falloff: 0.6 }; }
+        if (nf === 'cannon') { eff.splash = Math.max(eff.splash, 0.6 * state.mods.splash); }
+        eff.combos.push('Fletch');
+      }
+    }
+    eff.combos = [...new Set(eff.combos)];
+    t.eff = eff;
+  }
+  const seen = new Set();
+  for (const t of state.towers)
+    for (const [dx, dy] of DIRS) {
+      const n = towerAt(t.x + dx, t.y + dy); if (!n) continue;
+      const key = (t.x < n.x || (t.x === n.x && t.y < n.y)) ? `${t.x},${t.y}|${n.x},${n.y}` : `${n.x},${n.y}|${t.x},${t.y}`;
+      seen.add(key);
+    }
+  state.links = seen.size;
+}
+
 /* ---------------- Combat ---------------- */
 
-function damage(e, amt, canCrit) {
+function damage(e, amt, canCrit, forceCrit) {
   if (e.dead) return;
   let dmg = amt, crit = false;
-  if (canCrit && state.mods.crit > 0 && Math.random() < state.mods.crit) { dmg *= 2.5; crit = true; }
+  if (forceCrit || (canCrit && state.mods.crit > 0 && Math.random() < state.mods.crit)) { dmg *= 2.5; crit = true; }
   e.hp -= dmg;
   if (e.hp <= 0) {
     e.dead = true;
@@ -447,7 +518,7 @@ function applySlow(e, pct, dur) {
   e.slowT = Math.max(e.slowT, dur);
 }
 
-function teslaChain(origin, dmg, chain) {
+function teslaChain(origin, dmg, chain, chainPoison) {
   let cur = dmg * chain.falloff;
   const hit = new Set([origin]);
   let from = origin;
@@ -461,6 +532,7 @@ function teslaChain(origin, dmg, chain) {
     }
     if (!best) break;
     damage(best, cur, false);
+    if (chainPoison && !best.dead) { best.poisonDps = Math.max(best.poisonDps, chainPoison.dps); best.poisonT = Math.max(best.poisonT, chainPoison.dur); }
     hit.add(best); pts.push([best.x, best.y]); from = best; cur *= chain.falloff;
   }
   if (pts.length > 1) state.zaps.push({ pts, t: 0 });
@@ -493,15 +565,19 @@ function pickTargets(t, n) {
 }
 
 function fire(t, target) {
-  const base = TOWERS[t.type];
+  const base = TOWERS[t.type], e = t.eff || { dmgMul: 1 };
   const p = {
     x: t.x + 0.5, y: t.y + 0.5, type: t.type, color: base.color,
-    speed: base.projSpeed, dmg: towerDmg(t), target, lastX: target.x, lastY: target.y,
+    speed: base.projSpeed, dmg: towerDmg(t) * e.dmgMul, target, lastX: target.x, lastY: target.y,
   };
-  if (base.splash) p.splash = base.splash * state.mods.splash;
-  if (base.slow) { p.slow = base.slow; p.slowDur = base.slowDur; }
-  if (base.poison) p.poison = { dps: base.poison.dps * Math.pow(1.5, t.lvl - 1) * state.mods.dmg[base.fam] * state.mods.dmg.all, dur: base.poison.dur };
-  if (base.chain) p.chain = base.chain;
+  if (e.splash) p.splash = e.splash;
+  if (e.slow) { p.slow = e.slow; p.slowDur = e.slowDur; }
+  if (e.poison) p.poison = e.poison;
+  if (e.chain) p.chain = e.chain;
+  if (e.splashPoison) p.splashPoison = e.splashPoison;
+  if (e.chainPoison) p.chainPoison = e.chainPoison;
+  if (e.bonusVsSlow) p.bonusVsSlow = e.bonusVsSlow;
+  if (e.critVsSlow) p.critVsSlow = e.critVsSlow;
   state.projs.push(p);
 }
 
@@ -548,7 +624,7 @@ function update(dt) {
     if (t.cd > 0) continue;
     const base = TOWERS[t.type];
     const targets = base.multi ? pickTargets(t, base.multi) : (pickTarget(t) ? [pickTarget(t)] : []);
-    if (targets.length) { for (const tg of targets) fire(t, tg); t.cd = 1 / towerRate(t); }
+    if (targets.length) { for (const tg of targets) fire(t, tg); t.cd = 1 / (towerRate(t) * (t.eff ? t.eff.rateMul : 1)); }
     else t.cd = 0;
   }
 
@@ -563,16 +639,22 @@ function update(dt) {
         for (const e of state.enemies) {
           if (e.dead) continue;
           const ex = e.x - p.x, ey = e.y - p.y;
-          if (ex * ex + ey * ey <= p.splash * p.splash) damage(e, p.dmg, true);
+          if (ex * ex + ey * ey > p.splash * p.splash) continue;
+          let dmg = p.dmg;
+          if (p.bonusVsSlow && e.slowT > 0) dmg *= 1 + p.bonusVsSlow;
+          damage(e, dmg, true, p.critVsSlow && e.slowT > 0);
+          if (p.splashPoison && !e.dead) { e.poisonDps = Math.max(e.poisonDps, p.splashPoison.dps); e.poisonT = Math.max(e.poisonT, p.splashPoison.dur); }
         }
       } else if (alive) {
-        damage(p.target, p.dmg, true);
+        let dmg = p.dmg;
+        if (p.bonusVsSlow && p.target.slowT > 0) dmg *= 1 + p.bonusVsSlow;
+        damage(p.target, dmg, true, p.critVsSlow && p.target.slowT > 0);
         if (p.slow > 0 && !p.target.dead) applySlow(p.target, p.slow, p.slowDur);
         if (p.poison && !p.target.dead) {
           p.target.poisonDps = Math.max(p.target.poisonDps, p.poison.dps);
           p.target.poisonT = Math.max(p.target.poisonT, p.poison.dur);
         }
-        if (p.chain) teslaChain(p.target, p.dmg, p.chain);
+        if (p.chain) teslaChain(p.target, p.dmg, p.chain, p.chainPoison);
       }
     } else { p.x += dx / d * step; p.y += dy / d * step; }
   }
@@ -630,13 +712,32 @@ function draw() {
     ctx.stroke(); ctx.setLineDash([]);
   }
 
+  // fusion links (drawn under towers; gold = a named combo, faint = plain adjacency)
+  for (const t of state.towers)
+    for (const [dx, dy] of DIRS) {
+      if (dx + dy < 0) continue; // each pair once (right/down)
+      const n = towerAt(t.x + dx, t.y + dy); if (!n) continue;
+      const combo = (t.eff && t.eff.combos.length) || (n.eff && n.eff.combos.length);
+      ctx.strokeStyle = combo ? 'rgba(244,208,63,0.55)' : 'rgba(125,211,252,0.16)';
+      ctx.lineWidth = combo ? 3 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px(t.x) + ts / 2, py(t.y) + ts / 2);
+      ctx.lineTo(px(n.x) + ts / 2, py(n.y) + ts / 2);
+      ctx.stroke();
+    }
+
   for (const t of state.towers) {
-    const base = TOWERS[t.type];
+    const base = TOWERS[t.type], fused = t.eff && t.eff.combos.length;
     ctx.fillStyle = '#1c2430'; roundRect(px(t.x) + 2, py(t.y) + 2, ts - 4, ts - 4, ts * 0.18); ctx.fill();
-    ctx.strokeStyle = base.color; ctx.lineWidth = t === state.selected ? 2.5 : 1.2;
+    ctx.strokeStyle = fused ? '#f4d03f' : base.color; ctx.lineWidth = t === state.selected ? 2.5 : (fused ? 1.8 : 1.2);
     roundRect(px(t.x) + 2, py(t.y) + 2, ts - 4, ts - 4, ts * 0.18); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `${ts * 0.48}px serif`; ctx.fillStyle = '#fff';
     ctx.fillText(base.icon, px(t.x) + ts / 2, py(t.y) + ts * 0.46);
+    if (fused) {
+      ctx.fillStyle = '#f4d03f'; ctx.font = `bold ${ts * 0.3}px serif`;
+      ctx.fillText('✦', px(t.x) + ts * 0.26, py(t.y) + ts * 0.27);
+    }
     if (t.lvl > 1) {
       ctx.fillStyle = '#f4d03f'; ctx.font = `bold ${ts * 0.26}px sans-serif`;
       ctx.fillText(String(t.lvl), px(t.x) + ts * 0.74, py(t.y) + ts * 0.76);
@@ -767,15 +868,18 @@ function syncUI() {
 
 function syncTowerPanel() {
   const t = state.selected;
-  const sig = t ? `${t.x},${t.y},${t.lvl},${state.gold >= upgradeCost(t)},${t.lvl >= CFG.maxLevel}` : '';
+  const combos = t && t.eff ? t.eff.combos.join('|') : '';
+  const sig = t ? `${t.x},${t.y},${t.lvl},${state.gold >= upgradeCost(t)},${t.lvl >= CFG.maxLevel},${combos}` : '';
   if (sig === panelSig) return;
   panelSig = sig;
   if (!t) { towerPanel.classList.add('hidden'); towerPanel.innerHTML = ''; return; }
   const base = TOWERS[t.type], maxed = t.lvl >= CFG.maxLevel;
+  const eff = t.eff || { dmgMul: 1, combos: [] };
+  const comboLine = eff.combos.length ? `<br><span class="combo">✦ ${eff.combos.join(' · ')}</span>` : '';
   towerPanel.classList.remove('hidden');
   towerPanel.innerHTML = `
     <div class="tpInfo"><b>${base.icon} ${base.name} Lv${t.lvl}</b><br>
-      dmg ${Math.round(towerDmg(t))} · rng ${towerRange(t).toFixed(1)} · ${towerRate(t).toFixed(2)}/s</div>
+      dmg ${Math.round(towerDmg(t) * eff.dmgMul)} · rng ${towerRange(t).toFixed(1)} · ${(towerRate(t) * eff.rateMul).toFixed(2)}/s${comboLine}</div>
     <button id="tpUp" ${maxed || state.gold < upgradeCost(t) ? 'disabled' : ''}>${maxed ? 'MAX' : `⬆ ${upgradeCost(t)}🪙`}</button>
     <button id="tpSell" class="sell">💸 ${sellValue(t)}🪙</button>
     <button id="tpClose">✕</button>`;
@@ -788,7 +892,7 @@ function renderRelicBar() {
   const counts = {};
   for (const id of state.relics) counts[id] = (counts[id] || 0) + 1;
   const fam = state.fam || { offense: 0, economy: 0, control: 0 };
-  const famPart = Object.keys(FAMILY).map(f => `${FAMILY[f].icon}${fam[f]}`).join(' ');
+  const famPart = `🔗${state.links || 0}  ` + Object.keys(FAMILY).map(f => `${FAMILY[f].icon}${fam[f]}`).join(' ');
   const relicPart = Object.keys(counts).map(id => {
     const r = RELIC_BY_ID[id];
     return `${r.icon}${counts[id] > 1 ? `<sup>${counts[id]}</sup>` : ''}`;

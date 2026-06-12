@@ -22,6 +22,17 @@ Relics **stack with diminishing returns** per copy, but belong to families
 (⚔️ Offense / 💰 Economy / 🧊 Control); collecting 3 / 5 / 7 of a family triggers
 a big set-bonus spike, so you choose between spreading wide or committing deep.
 
+**Fusion** — towers that sit orthogonally adjacent *fuse* (🔗 links, shown on the
+board). The **shape** of your maze is now power, not just its length:
+- Diverse neighbors → +damage. Same-family neighbors → +fire rate.
+- Named combos: Frost+Cannon = **Shatter** (bonus vs slowed), Frost+Sniper =
+  **Cryo** (crit slowed), Cannon+Poison = **Toxic** (splash poisons),
+  Tesla+Poison = **Plague** (chains spread poison), Tesla+Frost = **Storm**
+  (extra chain hops), Sniper+Tesla = **Railarc** (shots chain). Arrow is a
+  **Fletcher** — it inherits a neighbor's on-hit (slow / poison / chain / splash).
+- The **Overload** relic turns raw link count into a global damage multiplier,
+  rewarding dense, clever packing — in tension with keeping the path long.
+
 **Between runs** — cores (= waves survived, +bonus for a new best) buy:
 - **Towers**: Frost, Cannon, Sniper, then Poison (DoT) and Tesla (chain).
 - **Variant branches**: each tower has an alt you equip as a loadout choice —

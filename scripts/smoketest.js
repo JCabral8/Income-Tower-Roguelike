@@ -156,14 +156,53 @@ const harness = `
   assert(state.towers.length === nTowers - 1, 'sell must remove tower');
   assert(state.path.length > 0, 'path must still exist after sell');
 
-  // Variant combat: poison applies a DoT, tesla chains without error.
+  // ---- Fusion synergies ----
+  meta.unlocked.frost = true; meta.unlocked.cannon = true; meta.unlocked.poison = true; meta.unlocked.tesla = true;
+  meta.equipped.frost = 'frost'; meta.equipped.cannon = 'cannon'; meta.equipped.poison = 'poison'; meta.equipped.tesla = 'tesla';
+  newRun();
+  state.gold = 100000; state.relics = []; recomputeMods();
+
+  // A lone tower has no links and no combos.
+  state.buildType = 'cannon'; state.ghost = { x: 2, y: 5, ok: true }; tryBuild(2, 5);
+  let cannon = towerAt(2, 5);
+  assert(state.links === 0, 'single tower => 0 links, got ' + state.links);
+  assert(cannon.eff.combos.length === 0, 'lone cannon has no combos');
+  const dmgAlone = towerDmg(cannon) * cannon.eff.dmgMul;
+
+  // Place a Frost next to it -> Shatter combo + a fusion link + diversity dmg.
+  state.buildType = 'frost'; state.ghost = { x: 3, y: 5, ok: true }; tryBuild(3, 5);
+  cannon = towerAt(2, 5);
+  assert(state.links === 1, 'adjacent pair => 1 link, got ' + state.links);
+  assert(cannon.eff.combos.includes('Shatter'), 'frost+cannon should Shatter, got ' + cannon.eff.combos.join(','));
+  assert(cannon.eff.bonusVsSlow > 0, 'Shatter must grant bonusVsSlow');
+  assert(cannon.eff.dmgMul > 1.0001, 'diverse neighbor should raise dmgMul, got ' + cannon.eff.dmgMul);
+  const dmgFused = towerDmg(cannon) * cannon.eff.dmgMul;
+  assert(dmgFused > dmgAlone + 1e-6, 'fused cannon should out-damage lone cannon');
+
+  // Tesla + Poison adjacency -> Plague (chain spreads poison).
+  state.buildType = 'tesla';  state.ghost = { x: 6, y: 8, ok: true }; tryBuild(6, 8);
+  state.buildType = 'poison'; state.ghost = { x: 7, y: 8, ok: true }; tryBuild(7, 8);
+  const tesla = towerAt(6, 8);
+  assert(tesla.eff.combos.includes('Plague'), 'tesla+poison should be Plague, got ' + tesla.eff.combos.join(','));
+  assert(tesla.eff.chainPoison && tesla.eff.chainPoison.dps > 0, 'Plague must attach chainPoison');
+
+  // Overload relic: damage scales with the board's link count.
+  const before = towerDmg(cannon);
+  pickRelic(RELIC_BY_ID.overload);
+  assert(state.mods.perLink > 0, 'overload should set perLink');
+  assert(towerDmg(cannon) > before + 1e-6, 'overload must raise damage via links');
+
+  // Variant combat: poison applies a DoT via a real (eff-bearing) tower.
+  state.towers = []; recomputeSynergies();
   state.relics = []; recomputeMods();
+  state.gold = 100000; state.buildType = 'poison'; state.ghost = { x: 2, y: 9, ok: true }; tryBuild(2, 9);
+  const pTower = towerAt(2, 9);
+  assert(pTower && pTower.eff.poison, 'poison tower should carry a poison effect');
   spawnEnemy({ hp: 500, speed: 0, bounty: 1, leak: 1, kind: 'grunt', color: '#fff', r: 0.26 });
   const victim = state.enemies[0];
-  const pTower = { x: 1, y: 1, type: 'poison', lvl: 1 };
   fire(pTower, victim);
-  state.projs[state.projs.length - 1].x = victim.x; // force immediate hit next update
-  state.projs[state.projs.length - 1].y = victim.y;
+  const proj = state.projs[state.projs.length - 1];
+  proj.x = victim.x; proj.y = victim.y; // force immediate hit next update
   state.phase = 'wave';
   update(1 / 30);
   assert(victim.poisonT > 0 || victim.dead, 'poison should apply a DoT');
