@@ -32,6 +32,7 @@ const els = new Map();
 global.document = {
   getElementById(id) { if (!els.has(id)) els.set(id, makeEl()); return els.get(id); },
   createElement() { return makeEl(); },
+  addEventListener() {},
 };
 global.window = { addEventListener() {}, devicePixelRatio: 1 };
 global.localStorage = { getItem: () => null, setItem() {} };
@@ -46,9 +47,13 @@ const harness = `
 ;(function runSmokeTest() {
   const assert = (cond, msg) => { if (!cond) throw new Error('ASSERT: ' + msg); };
 
+  // Clear any rolled map obstacles so board tests are deterministic.
+  const clearBoard = () => { state.blocked = new Uint8Array(COLS * ROWS); state.rock = new Uint8Array(COLS * ROWS); recomputeFlow(); recomputeSynergies(); };
+
   // Start a run (boot drops us on the title menu).
-  newRun();
+  newRun(); clearBoard();
   assert(state.phase === 'prep', 'newRun should enter prep, got ' + state.phase);
+  clearBoard();
 
   // Build a serpentine maze with arrows (only tower unlocked by default)
   state.gold = 100000; // test rig: ignore economy constraints for placement
@@ -116,20 +121,20 @@ const harness = `
   assert(!meta.unlocked.cannon, 'cannon should start locked');
   meta.cores -= TOWER_TREE.find(n => n.base === 'cannon').baseCost;
   meta.unlocked.cannon = true; meta.equipped.cannon = 'cannon';
-  newRun();
+  newRun(); clearBoard();
   const types = Array.from(document.getElementById('buildBtns').children).map(b => b.dataset.type);
   assert(types.includes('arrow') && types.includes('cannon'),
     'build menu should include unlocked towers, got ' + types.join(','));
 
   // Equip a variant branch -> build button reflects it.
   meta.unlocked.cannon_mortar = true; meta.equipped.cannon = 'cannon_mortar';
-  newRun();
+  newRun(); clearBoard();
   const types2 = Array.from(document.getElementById('buildBtns').children).map(b => b.dataset.type);
   assert(types2.includes('cannon_mortar'), 'equipped variant should appear, got ' + types2.join(','));
 
   // Permanent buff carries into a fresh run.
   meta.buffs.lives = 2;
-  newRun();
+  newRun(); clearBoard();
   assert(state.lives === CFG.startLives + 6, 'lives buff should apply, got ' + state.lives);
 
   // Economy actions on the live run.
@@ -159,7 +164,7 @@ const harness = `
   // ---- Fusion synergies ----
   meta.unlocked.frost = true; meta.unlocked.cannon = true; meta.unlocked.poison = true; meta.unlocked.tesla = true;
   meta.equipped.frost = 'frost'; meta.equipped.cannon = 'cannon'; meta.equipped.poison = 'poison'; meta.equipped.tesla = 'tesla';
-  newRun();
+  newRun(); clearBoard();
   state.gold = 100000; state.relics = []; recomputeMods();
 
   // A lone tower has no links and no combos.
@@ -206,6 +211,34 @@ const harness = `
   state.phase = 'wave';
   update(1 / 30);
   assert(victim.poisonT > 0 || victim.dead, 'poison should apply a DoT');
+
+  // ---- Enemy abilities ----
+  state.phase = 'wave'; state.enemies = []; childBuffer = [];
+  spawnEnemy({ hp: 100, speed: 0, bounty: 1, leak: 1, kind: 'tank', color: '#fff', r: 0.3, ability: 'shield' });
+  const sh = state.enemies[state.enemies.length - 1];
+  assert(sh.shield > 0, 'shielded enemy should have a shield');
+  const shHp = sh.hp;
+  damage(sh, 40, false);
+  assert(sh.hp === shHp && sh.shield > 0 && sh.shield < sh.maxShield, 'shield must absorb before hp');
+
+  state.enemies = []; childBuffer = [];
+  spawnEnemy({ hp: 10, speed: 0, bounty: 1, leak: 1, kind: 'swarm', color: '#fff', r: 0.2, ability: 'split' });
+  damage(state.enemies[0], 999, false);
+  assert(childBuffer.length >= 2, 'splitter should buffer children on death, got ' + childBuffer.length);
+  childBuffer = [];
+
+  // ---- Map generation always leaves a path ----
+  for (let i = 0; i < 8; i++) {
+    newRun();
+    assert(state.dist[idx(SPAWN.x, SPAWN.y)] >= 0, 'generated map must keep a spawn->exit path');
+  }
+
+  // ---- Discovery codex records first-time combos ----
+  meta.discovered = {};
+  newRun(); clearBoard();
+  state.gold = 100000; state.buildType = 'frost'; state.ghost = { x: 4, y: 6, ok: true }; tryBuild(4, 6);
+  state.buildType = 'cannon'; state.ghost = { x: 5, y: 6, ok: true }; tryBuild(5, 6);
+  assert(meta.discovered.Shatter, 'building frost+cannon should discover Shatter in the codex');
 
   console.log('SMOKE TEST PASSED');
 })();

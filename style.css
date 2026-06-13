@@ -252,6 +252,9 @@ canvas {
 }
 .shopName { font-weight: 800; font-size: 13px; margin-bottom: 6px; }
 .shopTip { font-size: 11px; color: #8b98a9; margin-top: 5px; }
+.shopRow.codex { padding: 7px 10px; }
+.shopRow.codex.locked { opacity: 0.5; }
+.shopRow.codex.locked .shopTip { font-style: italic; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chipBtn {
   background: #233044;

@@ -80,15 +80,31 @@ grunt → swarm → fast → tank.
 | ☠️ Poison | Damage-over-time | 🦠 Plague — stronger, longer DoT |
 | ⚡ Tesla | Chain lightning | 🌩️ Arc Coil — chains to far more targets |
 
+## Feel & discovery
+
+- **Juice**: hit flashes, kill particles, screen shake (booms, boss kills, leaks),
+  scaling damage pops, a low-lives danger vignette, and a mutable **WebAudio**
+  synth SFX layer (🔊/🔇, zero assets).
+- **Discovery codex**: combos are never taught — the first time you build a
+  recipe it splashes **✦ DISCOVERED** + bonus cores and etches into the Workshop
+  Codex. Undiscovered ones show as `???` with a cryptic hint to hunt.
+- **Creep abilities** (wave 6+), telegraphed by an **INCOMING** banner in prep:
+  🛡️ Shielded, ➕ Mending (heal aura), 🪓 Splitting, 💢 Berserk, and bosses that
+  **enrage** at half health.
+- **Map variety**: each run rolls a board layout — rocks, pillars, and bars that
+  reshape the maze puzzle (creeps path around them; you can't build on them).
+
 ## Roadmap (rough)
 
 1. Prototype loop — maze + income + draft ✅
 2. Roguelite meta — cores, tower/variant unlocks, permanent buffs ✅
-3. Balance pass + juice (sounds, hit effects), more relics & creep abilities
-4. More variant branches per tower; relic synergies across families
-5. The real dream: **income wars** — opponents (AI, then PvP) where *you send
-   the creeps* at each other, WC3 style
-6. Package as a mobile app (PWA → Capacitor) once the loop is proven
+3. Fusion builds — adjacency combos + link economy ✅
+4. Juice, sound, discovery codex, creep abilities, map variety ✅
+5. **Push-your-luck offense** — draft the incoming threat for bigger payouts
+6. The real dream: **income wars** — a rival (AI, then PvP) where *you send the
+   creeps* at each other, WC3 style
+7. Living board — terrain tiles (teleporters, conveyors) as roguelite rewards
+8. Package as a mobile app (PWA → Capacitor) once the loop is proven
 
 ## Code map
 
